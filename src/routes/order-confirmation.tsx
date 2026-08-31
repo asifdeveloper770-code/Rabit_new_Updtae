@@ -41,7 +41,7 @@ function OrderConfirmationPage() {
           order_items (
             id,
             quantity,
-            unit_price,
+            price,
             products (
               name,
               category,
@@ -124,7 +124,7 @@ function OrderConfirmationPage() {
             <span className="font-semibold uppercase tracking-wider text-slate-400">Fulfillment Status</span>
             <div className="mt-0.5">
               <span className="inline-block rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-600">
-                {order.status}
+                {order.order_status}
               </span>
             </div>
           </div>
@@ -168,10 +168,10 @@ function OrderConfirmationPage() {
 
                 <div className="text-right">
                   <div className="font-bold text-slate-900">
-                    ${(item.unit_price * item.quantity).toFixed(2)}
+                    ${(item.price * item.quantity).toFixed(2)}
                   </div>
                   <div className="text-[10px] font-semibold text-slate-400">
-                    {item.quantity} × ${item.unit_price.toFixed(2)}
+                    {item.quantity} × ${item.price.toFixed(2)}
                   </div>
                 </div>
               </li>
@@ -191,7 +191,7 @@ function OrderConfirmationPage() {
             <div className="flex justify-between border-t border-slate-100 pt-3 text-sm font-black text-slate-900">
               <span>Total Charged</span>
               <span className="text-lg text-[rgb(43_90_143)]">
-                ${order.total_amount.toFixed(2)}
+                ${order.total.toFixed(2)}
               </span>
             </div>
           </div>

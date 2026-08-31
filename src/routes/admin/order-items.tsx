@@ -74,7 +74,7 @@ function OrderItemsDashboard() {
       const productName = item.products?.name || pid;
       const category = item.products?.category || "Uncategorized";
       const img = item.products?.img || "/vial.jpg";
-      const revenue = (item.quantity || 0) * (item.unit_price || 0);
+      const revenue = (item.quantity || 0) * (item.price || 0);
 
       if (!summaryMap[pid]) {
         summaryMap[pid] = {
@@ -102,7 +102,7 @@ function OrderItemsDashboard() {
     items.forEach((item) => {
       if (item.orders?.status !== "Cancelled") {
         totalUnits += item.quantity || 0;
-        totalRevenue += (item.quantity || 0) * (item.unit_price || 0);
+        totalRevenue += (item.quantity || 0) * (item.price || 0);
       }
     });
 
@@ -258,7 +258,7 @@ function OrderItemsDashboard() {
                 </tr>
               ) : (
                 filteredItems.map((item) => {
-                  const lineTotal = (item.quantity || 0) * (item.unit_price || 0);
+                  const lineTotal = (item.quantity || 0) * (item.price || 0);
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-4">
@@ -292,7 +292,7 @@ function OrderItemsDashboard() {
                       </td>
 
                       <td className="p-4 text-slate-600">
-                        ${item.unit_price.toFixed(2)}
+                        ${item.price.toFixed(2)}
                       </td>
 
                       <td className="p-4 font-black text-slate-900">

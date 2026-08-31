@@ -41,9 +41,19 @@ export type Order = {
     state: string;
     zip: string;
   };
-  total_amount: number;
-  status: "Pending" | "Processing" | "Fulfilled" | "Cancelled";
+  total: number;
+  order_status: "pending" | "processing" | "fulfilled" | "cancelled";
   created_at?: string;
+  subtotal: number;
+  shipping: number;
+  tax: number;
+  full_name: string;
+  address: string;
+  state: string;
+  zip: number;
+  city: string;
+  phone: number;
+
 };
 
 export type OrderItem = {
@@ -51,5 +61,5 @@ export type OrderItem = {
   order_id: string;
   product_id: string;
   quantity: number;
-  unit_price: number;
+  price: number;
 };

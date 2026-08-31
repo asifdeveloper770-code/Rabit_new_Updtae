@@ -14,14 +14,14 @@ type OrderWithItems = Order & {
   order_items: DetailedOrderItem[];
 };
 
-const STATUS_OPTIONS: Order["status"][] = ["Pending", "Processing", "Fulfilled", "Cancelled"];
+const STATUS_OPTIONS: Order["order_status"][] = ["pending", "processing", "fulfilled", "cancelled"];
 
 function AdminOrdersDashboard() {
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const fetchOrders = async () => {
@@ -33,7 +33,7 @@ function AdminOrdersDashboard() {
         order_items (
           id,
           quantity,
-          unit_price,
+          price,
           products (
             name,
             category,
@@ -54,7 +54,7 @@ function AdminOrdersDashboard() {
     fetchOrders();
   }, []);
 
-  const handleStatusChange = async (orderId: string, newStatus: Order["status"]) => {
+  const handleStatusChange = async (orderId: string, newStatus: Order["order_status"]) => {
     setUpdatingId(orderId);
     const { error } = await supabase
       .from("orders")
@@ -76,13 +76,13 @@ function AdminOrdersDashboard() {
     let pendingCount = 0;
 
     orders.forEach((o) => {
-      if (o.status !== "Cancelled") {
-        totalRevenue += Number(o.total_amount || 0);
+      if (o.order_status !== "cancelled") {
+        totalRevenue += Number(o.total || 0);
         o.order_items?.forEach((item) => {
           totalUnitsSold += item.quantity || 0;
         });
       }
-      if (o.status === "Pending") pendingCount++;
+      if (o.order_status === "pending") pendingCount++;
     });
 
     return { totalRevenue, totalUnitsSold, pendingCount, totalOrders: orders.length };
@@ -90,7 +90,7 @@ function AdminOrdersDashboard() {
 
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
-      const matchesStatus = selectedStatus === "All" || o.status === selectedStatus;
+      const matchesStatus = selectedStatus === "All" || o.order_status === selectedStatus;
       const matchesSearch =
         o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         o.customer_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -173,11 +173,10 @@ function AdminOrdersDashboard() {
             <button
               key={status}
               onClick={() => setSelectedStatus(status)}
-              className={`rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${
-                selectedStatus === status
-                  ? "bg-[rgb(43_90_143)] text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+              className={`rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${selectedStatus === status
+                ? "bg-[rgb(43_90_143)] text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
             >
               {status}
             </button>
@@ -214,7 +213,7 @@ function AdminOrdersDashboard() {
                 </tr>
               ) : (
                 filteredOrders.map((order) => {
-                  const isExpanded = expandedOrderId === order.id;
+                  const isSelected = selectedOrderId === order.id;
                   const itemSummary = order.order_items
                     ?.map((i) => `${i.quantity}x ${i.products?.name || "Item"}`)
                     .join(", ");
@@ -238,23 +237,22 @@ function AdminOrdersDashboard() {
                       </td>
 
                       <td className="p-4 font-black text-slate-900">
-                        ${order.total_amount.toFixed(2)}
+                        ${Number(order.total ?? 0).toFixed(2)}
                       </td>
 
                       <td className="p-4">
                         <select
                           disabled={updatingId === order.id}
-                          value={order.status}
-                          onChange={(e) => handleStatusChange(order.id, e.target.value as Order["status"])}
-                          className={`rounded-lg px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider border-none focus:ring-2 focus:ring-[rgb(43_90_143)] ${
-                            order.status === "Fulfilled"
-                              ? "bg-emerald-50 text-emerald-600"
-                              : order.status === "Processing"
+                          value={order.order_status}
+                          onChange={(e) => handleStatusChange(order.id, e.target.value as Order["order_status"])}
+                          className={`rounded-lg px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider border-none focus:ring-2 focus:ring-[rgb(43_90_143)] ${order.order_status === "fulfilled"
+                            ? "bg-emerald-50 text-emerald-600"
+                            : order.order_status === "processing"
                               ? "bg-blue-50 text-blue-600"
-                              : order.status === "Cancelled"
-                              ? "bg-red-50 text-red-600"
-                              : "bg-amber-50 text-amber-600"
-                          }`}
+                              : order.order_status === "cancelled"
+                                ? "bg-red-50 text-red-600"
+                                : "bg-amber-50 text-amber-600"
+                            }`}
                         >
                           {STATUS_OPTIONS.map((st) => (
                             <option key={st} value={st}>
@@ -266,10 +264,10 @@ function AdminOrdersDashboard() {
 
                       <td className="p-4 text-right">
                         <button
-                          onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                          onClick={() => setSelectedOrderId(order.id)}
                           className="rounded-lg bg-slate-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
                         >
-                          {isExpanded ? "Hide Details" : "View Items"}
+                          View Items
                         </button>
                       </td>
                     </tr>
@@ -282,81 +280,176 @@ function AdminOrdersDashboard() {
       </div>
 
       {/* Expandable Order & Items Breakdown Panel */}
-      {expandedOrderId && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+      {/* Order Items Modal */}
+      {selectedOrderId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+          onClick={() => setSelectedOrderId(null)}
+        >
           {(() => {
-            const current = orders.find((o) => o.id === expandedOrderId);
+            const current = orders.find((o) => o.id === selectedOrderId);
+
             if (!current) return null;
+
             return (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div
+                className="w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[rgb(43_90_143)]">
-                      Order Line Items Breakdown
+                      Order Items
                     </span>
-                    <h3 className="font-mono text-base font-bold text-slate-900">{current.id}</h3>
+
+                    <h3 className="mt-1 font-mono text-base font-bold text-slate-900">
+                      {current.id}
+                    </h3>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      {current.customer_email}
+                    </p>
                   </div>
+
                   <button
-                    onClick={() => setExpandedOrderId(null)}
-                    className="text-xs font-bold uppercase text-slate-400 hover:text-slate-600"
+                    type="button"
+                    onClick={() => setSelectedOrderId(null)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-lg font-bold text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-900"
+                    aria-label="Close modal"
                   >
-                    Close
+                    ×
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                  {/* Itemized Table */}
-                  <div className="lg:col-span-2">
-                    <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
-                      Compounds in Order
-                    </h4>
-                    <div className="divide-y divide-slate-100 rounded-xl border border-slate-100">
-                      {current.order_items.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between p-3">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={item.products?.img || "/vial.jpg"}
-                              alt={item.products?.name || "Compound"}
-                              className="h-10 w-10 rounded-lg border border-slate-200 object-cover"
-                            />
-                            <div>
-                              <div className="text-xs font-bold text-slate-900">
-                                {item.products?.name || "Unknown Item"}
-                              </div>
-                              <div className="text-[10px] font-semibold text-[rgb(43_90_143)]">
-                                {item.products?.category || "Research Grade"}
-                              </div>
-                            </div>
-                          </div>
+                {/* Modal Body */}
+                <div className="max-h-[calc(90vh-90px)] overflow-y-auto p-6">
+                  {current.order_items?.length ? (
+                    <div className="space-y-3">
+                      {current.order_items.map((item) => {
+                        const quantity = Number(item.quantity ?? 0);
+                        const price = Number(item.price ?? 0);
+                        const lineTotal = price * quantity;
 
-                          <div className="text-right">
-                            <div className="text-xs font-bold text-slate-900">
-                              ${(item.unit_price * item.quantity).toFixed(2)}
+                        return (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4"
+                          >
+                            <div className="flex min-w-0 items-center gap-4">
+                              <img
+                                src={item.products?.img || "/vial.jpg"}
+                                alt={item.products?.name || "Compound"}
+                                className="h-14 w-14 shrink-0 rounded-xl border border-slate-200 bg-white object-cover"
+                              />
+
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-bold text-slate-900">
+                                  {item.products?.name || "Unknown Item"}
+                                </div>
+
+                                <div className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-[rgb(43_90_143)]">
+                                  {item.products?.category || "Research Grade"}
+                                </div>
+
+                                {item.products?.tag && (
+                                  <div className="mt-1 text-[10px] text-slate-400">
+                                    {item.products.tag}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <div className="text-[10px] font-semibold text-slate-400">
-                              {item.quantity} × ${item.unit_price.toFixed(2)}
+
+                            <div className="shrink-0 text-right">
+                              <div className="text-sm font-black text-slate-900">
+                                ${lineTotal.toFixed(2)}
+                              </div>
+
+                              <div className="mt-1 text-[10px] font-semibold text-slate-400">
+                                {quantity} × ${price.toFixed(2)}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-slate-200 p-10 text-center text-sm font-medium text-slate-400">
+                      No items found for this order.
+                    </div>
+                  )}
+
+                  {/* Order Summary */}
+                  <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Subtotal</span>
+                        <span className="font-semibold text-slate-900">
+                          ${Number(current.subtotal ?? 0).toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Shipping</span>
+                        <span className="font-semibold text-slate-900">
+                          ${Number(current.shipping ?? 0).toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Tax</span>
+                        <span className="font-semibold text-slate-900">
+                          ${Number(current.tax ?? 0).toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex justify-between border-t border-slate-100 pt-3">
+                        <span className="font-bold text-slate-900">
+                          Total
+                        </span>
+
+                        <span className="font-black text-[rgb(43_90_143)]">
+                          ${Number(current.total ?? 0).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Shipping Info Card */}
-                  <div>
-                    <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
+                  {/* Delivery Address */}
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                    <h4 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       Delivery Address
                     </h4>
-                    <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-xs space-y-1">
-                      <p className="font-bold text-slate-900">{current.shipping_address?.name}</p>
-                      <p className="text-slate-600">{current.shipping_address?.street}</p>
-                      <p className="text-slate-600">
-                        {current.shipping_address?.city}, {current.shipping_address?.state}{" "}
-                        {current.shipping_address?.zip}
+
+                    <div className="space-y-1 text-xs">
+                      <p className="font-bold text-slate-900">
+                        {current.shipping_address?.name || current.full_name || "N/A"}
                       </p>
-                      <div className="pt-2 border-t border-slate-200/60 mt-2">
-                        <span className="text-[10px] font-bold uppercase text-slate-400">Contact</span>
-                        <p className="font-semibold text-[rgb(43_90_143)]">{current.customer_email}</p>
+
+                      <p className="text-slate-600">
+                        {current.shipping_address?.street || current.address || "N/A"}
+                      </p>
+
+                      <p className="text-slate-600">
+                        {current.shipping_address?.city || current.city},{" "}
+                        {current.shipping_address?.state || current.state}{" "}
+                        {current.shipping_address?.zip || current.zip}
+                      </p>
+
+                      <div className="mt-3 border-t border-slate-200 pt-3">
+                        <span className="text-[10px] font-bold uppercase text-slate-400">
+                          Contact
+                        </span>
+
+                        <p className="font-semibold text-[rgb(43_90_143)]">
+                          {current.customer_email}
+                        </p>
+
+                        {current.phone && (
+                          <p className="mt-1 text-slate-600">
+                            {current.phone}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
