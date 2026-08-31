@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PRODUCTS, CATEGORIES, type Category } from "@/lib/products";
 import { useCart } from "@/lib/cart";
 import { useReveal } from "@/lib/useReveal";
-import { Search, Check, ArrowRight } from "lucide-react";
+import { Search, Check, ArrowRight, SlidersHorizontal, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type Product = {
@@ -55,19 +55,9 @@ const SORTS = [
   { key: "popularity", label: "Most popular" },
   { key: "price-asc", label: "Price · low to high" },
   { key: "price-desc", label: "Price · high to low" },
-  // { key: "purity", label: "Highest purity" },
 ] as const;
 
 type SortKey = (typeof SORTS)[number]["key"];
-
-function purityOf(p: (typeof PRODUCTS)[number]) {
-  const spec = p.specs.find((s) => s.label.toLowerCase() === "purity");
-  return spec ? parseFloat(spec.value) || 0 : 0;
-}
-
-function popularityOf(p: (typeof PRODUCTS)[number]) {
-  return PRODUCTS.length - PRODUCTS.findIndex((x) => x.id === p.id);
-}
 
 function ShopPage() {
   useReveal();
@@ -79,6 +69,7 @@ function ShopPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const PRODUCTS_PER_PAGE = 10;
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -177,123 +168,163 @@ function ShopPage() {
     return sorted;
   }, [products, cat, q, sort]);
 
-  const totalPages = Math.ceil(
-    filtered.length / PRODUCTS_PER_PAGE
-  );
+  const totalPages = Math.ceil(filtered.length / PRODUCTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
+  const endIndex = startIndex + PRODUCTS_PER_PAGE;
+  const paginatedProducts = filtered.slice(startIndex, endIndex);
 
-  const startIndex =
-    (currentPage - 1) * PRODUCTS_PER_PAGE;
-
-  const endIndex =
-    startIndex + PRODUCTS_PER_PAGE;
-
-  const paginatedProducts = filtered.slice(
-    startIndex,
-    endIndex
-  );
   useEffect(() => {
     setCurrentPage(1);
   }, [cat, q, sort]);
 
+  const filterContent = (
+    <>
+      <div className="group relative mb-6">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-[rgb(43_90_143)]" />
+        <input
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            navigate({
+              search: (prev: any) => ({
+                ...prev,
+                q: e.target.value || undefined,
+              }),
+            });
+          }}
+          placeholder="Search compounds..."
+          className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 font-sans text-xs text-slate-900 placeholder:text-slate-400 shadow-sm transition-all duration-200 hover:border-slate-300 focus:border-[rgb(43_90_143)] focus:outline-none focus:ring-2 focus:ring-[rgb(43_90_143)]/15"
+        />
+      </div>
+
+      <div className="font-sans text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        Category
+      </div>
+      <ul className="mt-3 space-y-1">
+        {CATEGORIES.map((c) => (
+          <li key={c}>
+            <button
+              onClick={() => {
+                navigate({
+                  search: (prev: any) => ({
+                    ...prev,
+                    cat: c === "All" ? undefined : c,
+                  }),
+                });
+                setMobileFiltersOpen(false);
+              }}
+              className={`group relative flex w-full items-center justify-between rounded-lg border-l-2 py-2.5 pl-3 pr-2 text-left font-sans text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+                cat === c
+                  ? "border-[rgb(43_90_143)] bg-white text-[rgb(43_90_143)] shadow-sm"
+                  : "border-transparent text-slate-500 hover:bg-slate-100/70 hover:pl-4 hover:text-[rgb(43_90_143)]"
+              }`}
+            >
+              <span>{c}</span>
+              {cat === c && (
+                <span className="h-1.5 w-1.5 rounded-full bg-[rgb(43_90_143)]" />
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-8 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        Sort by
+      </div>
+      <ul className="mt-3 space-y-1">
+        {SORTS.map((s) => (
+          <li key={s.key}>
+            <button
+              onClick={() => {
+                navigate({
+                  search: (prev: any) => ({
+                    ...prev,
+                    sort: s.key === "popularity" ? undefined : s.key,
+                  }),
+                });
+                setMobileFiltersOpen(false);
+              }}
+              className={`group flex w-full items-center justify-between rounded-lg border-l-2 py-2.5 pl-3 pr-2 text-left font-sans text-xs transition-all duration-200 ${
+                sort === s.key
+                  ? "border-[rgb(93_138_111)] bg-white font-bold text-[rgb(93_138_111)] shadow-sm"
+                  : "border-transparent font-medium text-slate-500 hover:bg-slate-100/70 hover:pl-4 hover:text-[rgb(93_138_111)]"
+              }`}
+            >
+              <span>{s.label}</span>
+              {sort === s.key && (
+                <span className="h-1.5 w-1.5 rounded-full bg-[rgb(93_138_111)]" />
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
 
   return (
-    <main className="relative min-h-screen bg-slate-50 pt-28 font-sans text-slate-800 antialiased selection:bg-[rgb(43_90_143)]/10 selection:text-[rgb(43_90_143)]">
-      {/* Page Header */}
-      <section className="border-b border-slate-200/80 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-end justify-between gap-6 px-6 py-12 md:px-12">
+    <main className="relative min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 pt-16 font-sans text-slate-800 antialiased selection:bg-[rgb(43_90_143)]/10 selection:text-[rgb(43_90_143)] sm:pt-28">
+      {/* Header Container */}
+      <section className="w-full border-b border-slate-200/80 bg-white shadow-sm">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-end justify-between gap-2 px-3 py-4 sm:px-6 md:px-12 md:py-12">
           <div>
-            <span className="font-sans text-xs font-bold uppercase tracking-widest text-[rgb(43_90_143)]">
+            <span className="font-sans text-[9px] font-bold uppercase tracking-widest text-[rgb(43_90_143)] sm:text-xs">
               Catalogue
             </span>
-            <h1 className="mt-2 font-sans text-4xl font-extrabold leading-tight tracking-tight text-slate-900 md:text-6xl">
+            <h1 className="mt-0.5 font-sans text-xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-4xl md:text-6xl">
               Research peptides
             </h1>
           </div>
-          <p className="max-w-sm font-sans text-sm leading-relaxed text-slate-600">
-            {products.length} compounds available. Select a compound to view
-            available specifications, variants, pricing, and product details.
+          <p className="max-w-sm font-sans text-[11px] leading-tight text-slate-600 sm:text-sm">
+            {products.length} compounds available. Select a compound to view specifications, variants, pricing, and details.
           </p>
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-6xl gap-10 px-6 py-12 md:grid-cols-[220px_1fr] md:px-12">
-        {/* Sidebar */}
-        <aside className="md:sticky md:top-28 md:self-start">
-          <div className="group relative mb-8">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-[rgb(43_90_143)]" />
-            <input
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                navigate({
-                  search: (prev: any) => ({ ...prev, q: e.target.value || undefined }),
-                });
-              }}
-              placeholder="Search compounds..."
-              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 font-sans text-xs text-slate-900 placeholder:text-slate-400 shadow-sm transition-all duration-200 hover:border-slate-300 focus:border-[rgb(43_90_143)] focus:outline-none focus:ring-2 focus:ring-[rgb(43_90_143)]/15"
-            />
-          </div>
-
-          <div className="font-sans text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Category
-          </div>
-          <ul className="mt-3 space-y-1">
-            {CATEGORIES.map((c) => (
-              <li key={c}>
-                <button
-                  onClick={() =>
-                    navigate({
-                      search: (prev: any) => ({ ...prev, cat: c === "All" ? undefined : c }),
-                    })
-                  }
-                  className={`group relative flex w-full items-center justify-between rounded-lg border-l-2 py-2 pl-3 pr-2 text-left font-sans text-xs font-bold uppercase tracking-wider transition-all duration-200 ${cat === c
-                    ? "border-[rgb(43_90_143)] bg-white text-[rgb(43_90_143)] shadow-sm"
-                    : "border-transparent text-slate-500 hover:bg-slate-100/70 hover:pl-4 hover:text-[rgb(43_90_143)]"
-                    }`}
-                >
-                  <span>{c}</span>
-                  {cat === c && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-[rgb(43_90_143)]" />
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-8 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Sort by
-          </div>
-          <ul className="mt-3 space-y-1">
-            {SORTS.map((s) => (
-              <li key={s.key}>
-                <button
-                  onClick={() =>
-                    navigate({
-                      search: (prev: any) => ({
-                        ...prev,
-                        sort: s.key === "popularity" ? undefined : s.key,
-                      }),
-                    })
-                  }
-                  className={`group flex w-full items-center justify-between rounded-lg border-l-2 py-2 pl-3 pr-2 text-left font-sans text-xs transition-all duration-200 ${sort === s.key
-                    ? "border-[rgb(93_138_111)] bg-white font-bold text-[rgb(93_138_111)] shadow-sm"
-                    : "border-transparent font-medium text-slate-500 hover:bg-slate-100/70 hover:pl-4 hover:text-[rgb(93_138_111)]"
-                    }`}
-                >
-                  <span>{s.label}</span>
-                  {sort === s.key && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-[rgb(93_138_111)]" />
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
+      {/* Main Container */}
+      <div className="mx-auto w-full max-w-6xl px-3 py-4 sm:px-6 sm:py-12 lg:grid lg:grid-cols-[220px_1fr] lg:gap-10 md:px-12">
+        {/* Desktop Sidebar */}
+        <aside className="hidden lg:sticky lg:top-28 lg:block lg:self-start">
+          {filterContent}
         </aside>
 
-        {/* Product Cards */}
-        <section>
-          <div className="mb-6 flex flex-wrap items-center gap-2">
-            <span className="mr-2 font-sans text-xs font-bold uppercase tracking-wider text-slate-400">
+        {/* Mobile Filter Controls */}
+        <div className="flex items-center justify-between mb-3 lg:hidden">
+          <button
+            onClick={() => setMobileFiltersOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-sans text-[11px] font-bold text-slate-700 shadow-xs transition-all hover:bg-slate-50 active:scale-95"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5 text-[rgb(43_90_143)]" />
+            <span>Filter & Sort</span>
+          </button>
+          <span className="font-sans text-[11px] font-semibold text-slate-500">
+            {filtered.length} {filtered.length === 1 ? "item" : "items"}
+          </span>
+        </div>
+
+        {/* Mobile Filter Drawer Modal */}
+        {mobileFiltersOpen && (
+          <div className="fixed inset-0 z-50 flex bg-slate-900/40 backdrop-blur-xs lg:hidden">
+            <div className="relative ml-auto h-full w-full max-w-xs overflow-y-auto bg-slate-50 p-6 shadow-2xl">
+              <div className="mb-6 flex items-center justify-between border-b border-slate-200 pb-4">
+                <span className="font-sans text-sm font-bold uppercase tracking-wider text-slate-900">
+                  Filters
+                </span>
+                <button
+                  onClick={() => setMobileFiltersOpen(false)}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              {filterContent}
+            </div>
+          </div>
+        )}
+
+        {/* Main Product Area */}
+        <section className="w-full">
+          <div className="mb-3 flex flex-wrap items-center gap-1.5 sm:mb-6 sm:gap-2">
+            <span className="hidden font-sans text-xs font-bold uppercase tracking-wider text-slate-400 lg:inline-block lg:mr-2">
               {filtered.length} result{filtered.length === 1 ? "" : "s"}
             </span>
 
@@ -333,85 +364,62 @@ function ShopPage() {
                 sort === "popularity"
                   ? undefined
                   : () =>
-                    navigate({
-                      search: (p: any) => ({
-                        ...p,
-                        sort: undefined,
-                      }),
-                    })
+                      navigate({
+                        search: (p: any) => ({
+                          ...p,
+                          sort: undefined,
+                        }),
+                      })
               }
             />
           </div>
 
           {filtered.length === 0 ? (
-            <div className="rounded-3xl border border-slate-200/80 bg-white p-12 text-center shadow-sm">
-              <p className="font-sans text-3xl font-extrabold text-slate-900">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-6 text-center shadow-sm sm:p-12">
+              <p className="font-sans text-lg font-extrabold text-slate-900 sm:text-3xl">
                 No matches found
               </p>
-
-              <p className="mt-2 font-sans text-sm text-slate-500">
+              <p className="mt-1 font-sans text-xs text-slate-500 sm:text-sm">
                 Try adjusting your search query or clearing active filters.
               </p>
             </div>
           ) : (
             <>
-              {/* Products */}
-              <div className="space-y-4">
+              {/* Responsive 2-column mobile grid without horizontal scroll */}
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-1 lg:gap-4">
                 {paginatedProducts.map((p) => (
-                  <ProductRow
-                    key={p.id}
-                    product={p}
-                  />
+                  <ProductCard key={p.id} product={p} />
                 ))}
               </div>
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-slate-200 pt-6 sm:flex-row">
-
-                  {/* Results */}
-                  <div className="text-xs font-semibold text-slate-400">
+                <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-slate-200 pt-4 sm:flex-row">
+                  <div className="text-[11px] font-semibold text-slate-400">
                     Showing{" "}
-                    <span className="text-slate-700">
-                      {startIndex + 1}
-                    </span>
+                    <span className="text-slate-700">{startIndex + 1}</span>
                     {" – "}
                     <span className="text-slate-700">
-                      {Math.min(
-                        endIndex,
-                        filtered.length
-                      )}
+                      {Math.min(endIndex, filtered.length)}
                     </span>
                     {" of "}
-                    <span className="text-slate-700">
-                      {filtered.length}
-                    </span>{" "}
+                    <span className="text-slate-700">{filtered.length}</span>{" "}
                     products
                   </div>
 
-                  {/* Controls */}
-                  <div className="flex items-center gap-2">
-
-                    {/* Previous */}
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       disabled={currentPage === 1}
                       onClick={() => {
-                        setCurrentPage((page) =>
-                          Math.max(1, page - 1)
-                        );
-
-                        window.scrollTo({
-                          top: 0,
-                          behavior: "smooth",
-                        });
+                        setCurrentPage((page) => Math.max(1, page - 1));
+                        window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 transition-all hover:border-[rgb(43_90_143)] hover:text-[rgb(43_90_143)] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 transition-all hover:border-[rgb(43_90_143)] hover:text-[rgb(43_90_143)] disabled:cursor-not-allowed disabled:opacity-40 sm:px-4 sm:text-xs"
                     >
                       Previous
                     </button>
 
-                    {/* Pages */}
                     <div className="flex items-center gap-1">
                       {Array.from(
                         { length: totalPages },
@@ -422,46 +430,32 @@ function ShopPage() {
                           type="button"
                           onClick={() => {
                             setCurrentPage(page);
-
-                            window.scrollTo({
-                              top: 0,
-                              behavior: "smooth",
-                            });
+                            window.scrollTo({ top: 0, behavior: "smooth" });
                           }}
-                          className={`flex h-9 min-w-9 items-center justify-center rounded-xl px-3 text-xs font-bold transition-all ${currentPage === page
-                            ? "bg-[rgb(43_90_143)] text-white shadow-sm"
-                            : "border border-slate-200 bg-white text-slate-500 hover:border-[rgb(43_90_143)] hover:text-[rgb(43_90_143)]"
-                            }`}
+                          className={`flex h-7 min-w-7 items-center justify-center rounded-lg px-1.5 text-xs font-bold transition-all sm:h-9 sm:min-w-9 sm:px-3 ${
+                            currentPage === page
+                              ? "bg-[rgb(43_90_143)] text-white shadow-xs"
+                              : "border border-slate-200 bg-white text-slate-500 hover:border-[rgb(43_90_143)] hover:text-[rgb(43_90_143)]"
+                          }`}
                         >
                           {page}
                         </button>
                       ))}
                     </div>
 
-                    {/* Next */}
                     <button
                       type="button"
-                      disabled={
-                        currentPage === totalPages
-                      }
+                      disabled={currentPage === totalPages}
                       onClick={() => {
                         setCurrentPage((page) =>
-                          Math.min(
-                            totalPages,
-                            page + 1
-                          )
+                          Math.min(totalPages, page + 1)
                         );
-
-                        window.scrollTo({
-                          top: 0,
-                          behavior: "smooth",
-                        });
+                        window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 transition-all hover:border-[rgb(43_90_143)] hover:text-[rgb(43_90_143)] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 transition-all hover:border-[rgb(43_90_143)] hover:text-[rgb(43_90_143)] disabled:cursor-not-allowed disabled:opacity-40 sm:px-4 sm:text-xs"
                     >
                       Next
                     </button>
-
                   </div>
                 </div>
               )}
@@ -470,95 +464,89 @@ function ShopPage() {
         </section>
       </div>
 
-      <div className="py-12" />
+      <div className="py-6" />
     </main>
   );
 }
 
-function ProductRow({ product }: { product: Product }) {
+function ProductCard({ product }: { product: Product }) {
   return (
-    <div className="group relative rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-[rgb(43_90_143)]/40 hover:bg-slate-50/80 hover:shadow-xl hover:shadow-[rgb(43_90_143)]/5 md:p-6">
-      <div className="grid grid-cols-[88px_1fr] items-center gap-5 sm:grid-cols-[112px_1fr_auto] sm:gap-8">
-
-        {/* IMAGE */}
+    <div className="group relative flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs transition-all duration-300 hover:border-[rgb(43_90_143)]/40 hover:bg-slate-50/80 hover:shadow-md sm:p-4 lg:flex-row lg:items-center lg:rounded-2xl lg:p-6">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-6">
+        {/* COMPACT IMAGE CONTAINER */}
         <Link
           to="/shop/$productId"
           params={{ productId: product.id }}
-          className="block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs transition-colors group-hover:border-[rgb(43_90_143)]/30"
+          className="relative block h-32 w-full overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 shadow-xs transition-colors group-hover:border-[rgb(43_90_143)]/30 sm:h-44 lg:h-28 lg:w-28 lg:shrink-0"
         >
           {product.img ? (
             <img
               src={product.img}
               alt={product.name}
               loading="lazy"
-              width={224}
-              height={224}
-              className="h-[88px] w-[88px] object-cover transition-transform duration-500 group-hover:scale-110 sm:h-28 sm:w-28"
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-[88px] w-[88px] items-center justify-center bg-slate-50 text-[10px] font-bold uppercase text-slate-400 sm:h-28 sm:w-28">
+            <div className="flex h-full w-full items-center justify-center bg-slate-50 text-[10px] font-bold uppercase text-slate-400">
               No Image
             </div>
           )}
         </Link>
 
-        {/* PRODUCT INFORMATION */}
-        <div className="min-w-0">
-          {/* CATEGORY */}
-          <div className="font-sans text-[11px] font-bold uppercase tracking-wider text-[rgb(43_90_143)]">
+        {/* DETAILS */}
+        <div className="min-w-0 flex-1">
+          <div className="font-sans text-[8px] font-bold uppercase tracking-wider text-[rgb(43_90_143)] sm:text-[10px] lg:text-[11px]">
             {product.category || "Research Compound"}
           </div>
 
-          {/* NAME */}
           <Link
             to="/shop/$productId"
             params={{ productId: product.id }}
-            className="mt-1 block font-sans text-2xl font-extrabold text-slate-900 transition-colors duration-200 hover:text-[rgb(43_90_143)] sm:text-3xl"
+            className="mt-0.5 block truncate font-sans text-xs font-extrabold text-slate-900 transition-colors duration-200 hover:text-[rgb(43_90_143)] sm:text-base lg:text-2xl"
           >
             {product.name}
           </Link>
 
-          {/* SHORT DESCRIPTION */}
           {product.summary && (
-            <p className="mt-2 max-w-lg font-sans text-sm leading-relaxed text-slate-600">
+            <p className="mt-1 hidden line-clamp-2 font-sans text-xs leading-relaxed text-slate-600 lg:block lg:max-w-lg lg:text-sm">
               {product.summary}
             </p>
           )}
 
-          {/* GENERAL PRODUCT INFO */}
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-1 flex flex-wrap gap-1 lg:gap-2">
             {product.tag && product.tag !== product.category && (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-slate-500 sm:text-[9px] lg:px-3 lg:py-1 lg:text-[10px]">
                 {product.tag}
               </span>
             )}
 
-            {product.specs?.slice(0, 2).map((spec) => (
+            {product.specs?.slice(0, 1).map((spec) => (
               <span
                 key={spec.label}
-                className="rounded-full bg-[rgb(43_90_143)]/5 px-3 py-1 text-[10px] font-semibold text-[rgb(43_90_143)]"
+                className="rounded-full bg-[rgb(43_90_143)]/5 px-1.5 py-0.5 text-[8px] font-semibold text-[rgb(43_90_143)] sm:text-[9px] lg:px-3 lg:py-1 lg:text-[10px]"
               >
                 {spec.label}: {spec.value}
               </span>
             ))}
           </div>
         </div>
+      </div>
 
-        {/* DETAILS BUTTON */}
-        <div className="col-span-2 flex items-center justify-end border-t border-slate-100 pt-4 sm:col-span-1 sm:border-0 sm:pt-0">
-          <Link
-            to="/shop/$productId"
-            params={{ productId: product.id }}
-            className="inline-flex items-center gap-2 rounded-full bg-[rgb(43_90_143)] px-5 py-2.5 font-sans text-xs font-bold uppercase tracking-wider text-white shadow-sm transition-all duration-200 hover:bg-[rgb(35_74_119)] hover:shadow-md hover:shadow-[rgb(43_90_143)]/20 active:scale-95"
-          >
-            <span>View variants</span>
-            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
-          </Link>
-        </div>
+      {/* CTA BUTTON */}
+      <div className="mt-2 flex items-center justify-end border-t border-slate-100 pt-2 lg:mt-0 lg:border-0 lg:pt-0">
+        <Link
+          to="/shop/$productId"
+          params={{ productId: product.id }}
+          className="inline-flex w-full items-center justify-center gap-1 rounded-md bg-[rgb(43_90_143)] py-1.5 font-sans text-[9px] font-bold uppercase tracking-wider text-white shadow-xs transition-all duration-200 hover:bg-[rgb(35_74_119)] hover:shadow-md active:scale-95 sm:text-[10px] lg:w-auto lg:rounded-full lg:px-5 lg:py-2.5 lg:text-xs"
+        >
+          <span>View details</span>
+          <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5 lg:h-3.5 lg:w-3.5" />
+        </Link>
       </div>
     </div>
   );
 }
+
 function Chip({
   label,
   onClear,
@@ -571,17 +559,18 @@ function Chip({
   const isGreen = tone === "green";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-sans text-xs font-bold transition-all duration-200 hover:scale-105 ${isGreen
-        ? "border-[rgb(93_138_111)]/30 bg-[rgb(93_138_111)]/10 text-[rgb(93_138_111)]"
-        : "border-[rgb(43_90_143)]/30 bg-[rgb(43_90_143)]/10 text-[rgb(43_90_143)]"
-        }`}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-sans text-[9px] font-bold transition-all sm:text-xs ${
+        isGreen
+          ? "border-[rgb(93_138_111)]/30 bg-[rgb(93_138_111)]/10 text-[rgb(93_138_111)]"
+          : "border-[rgb(43_90_143)]/30 bg-[rgb(43_90_143)]/10 text-[rgb(43_90_143)]"
+      }`}
     >
       {label}
       {onClear && (
         <button
           onClick={onClear}
           aria-label={`Clear ${label}`}
-          className="ml-0.5 text-xs font-extrabold opacity-60 transition-opacity hover:opacity-100"
+          className="ml-0.5 text-xs font-extrabold opacity-60 hover:opacity-100"
         >
           ×
         </button>

@@ -307,7 +307,7 @@ const handleCreateOrUpdateProduct = async (e: React.FormEvent) => {
       specs: editingProduct?.specs ?? null,
       stack: editingProduct?.stack ?? null,
       stock: editingProduct?.stock ?? 0,
-      variants: editingProduct?.variants ?? null,
+      variants: editingProduct?.product_variations ?? null,
     };
 
     // ---------------------------------------------------------
@@ -319,6 +319,7 @@ const handleCreateOrUpdateProduct = async (e: React.FormEvent) => {
         .from("products")
         .update({
           name: productPayload.name,
+          // uuid_id:productPayload.uuid,
           tag: productPayload.tag,
           price: productPayload.price,
           img: productPayload.img,
@@ -567,6 +568,7 @@ const handleUpdateVariantInline = async (
 
   const openEditModal = (product: ExtendedProduct) => {
     setEditingProduct(product);
+    
     setName(product.name || "");
     setTag(product.tag || "");
     setPrice(String(product.price ?? ""));
