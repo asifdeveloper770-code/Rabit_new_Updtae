@@ -8,25 +8,21 @@ export interface DatabaseVariant {
   // IMPORTANT:
   // This is products.uuid_id, NOT products.id
   product_id?: string;
-
   id_number: string;
   cas_number: string | null;
   specification: string;
-
   price: number;
   quantity: number;
   stock: number;
-
   img: string | null;
-
   created_at?: string;
-
   // Frontend-only fields
   imageFile?: File | null;
   imagePreview?: string;
 }
 
 export interface ExtendedProduct extends Product {
+  slug: any;
   product_variations?: DatabaseVariant[];
 }
 
@@ -38,11 +34,11 @@ function AdminProducts() {
   const [products, setProducts] = useState<ExtendedProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
   // Core Product Form State
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
   const [price, setPrice] = useState("");
+  const [productSearch, setProductSearch] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -68,15 +64,38 @@ function AdminProducts() {
   // Master Products Pagination State
   const [productCurrentPage, setProductCurrentPage] = useState(1);
   const [productItemsPerPage, setProductItemsPerPage] = useState(5);
-
   // Calculate total pages for Master Products
-  const totalProductPages = Math.ceil(products.length / productItemsPerPage) || 1;
+  const filteredProducts = useMemo(() => {
+    const search = productSearch.trim().toLowerCase();
 
-  // Slice products for the current page
+    if (!search) return products;
+
+    return products.filter((product) => {
+      return (
+        product.name?.toLowerCase().includes(search) ||
+        product.id?.toLowerCase().includes(search) ||
+        product.category?.toLowerCase().includes(search) ||
+        product.tag?.toLowerCase().includes(search) ||
+        product.slug?.toLowerCase().includes(search)
+      );
+    });
+  }, [products, productSearch]);
+
+  const totalProductPages =
+    Math.ceil(filteredProducts.length / productItemsPerPage) || 1;
+
   const paginatedProducts = useMemo(() => {
     const startIndex = (productCurrentPage - 1) * productItemsPerPage;
-    return products.slice(startIndex, startIndex + productItemsPerPage);
-  }, [products, productCurrentPage, productItemsPerPage]);
+
+    return filteredProducts.slice(
+      startIndex,
+      startIndex + productItemsPerPage
+    );
+  }, [filteredProducts, productCurrentPage, productItemsPerPage]);
+
+  useEffect(() => {
+    setProductCurrentPage(1);
+  }, [productSearch, productItemsPerPage]);
 
   // Reset to page 1 if items per page changes
   useEffect(() => {
@@ -84,13 +103,11 @@ function AdminProducts() {
   }, [productItemsPerPage]);
 
   const [editingProduct, setEditingProduct] = useState<ExtendedProduct | null>(null);
-
   // Filter & Pagination State
   const [variantSearch, setVariantSearch] = useState("");
   const [variantCategoryFilter, setVariantCategoryFilter] = useState("ALL");
   const [variantCurrentPage, setVariantCurrentPage] = useState(1);
   const [variantItemsPerPage, setVariantItemsPerPage] = useState(5);
-
   const fetchProducts = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -132,9 +149,7 @@ function AdminProducts() {
       return matchesSearch && matchesCategory;
     });
   }, [flatVariantsList, variantSearch, variantCategoryFilter]);
-
   const totalVariantPages = Math.ceil(filteredVariants.length / variantItemsPerPage) || 1;
-
   const paginatedVariants = useMemo(() => {
     const startIndex = (variantCurrentPage - 1) * variantItemsPerPage;
     return filteredVariants.slice(startIndex, startIndex + variantItemsPerPage);
@@ -143,7 +158,6 @@ function AdminProducts() {
   useEffect(() => {
     setVariantCurrentPage(1);
   }, [variantSearch, variantCategoryFilter, variantItemsPerPage]);
-
   const generateProductId = (name: string) => {
     return name
       .toLowerCase()
@@ -155,7 +169,6 @@ function AdminProducts() {
   const uploadImageToStorage = async (file: File, fileNamePrefix: string) => {
     const fileExt = file.name.split(".").pop();
     const fileName = `${fileNamePrefix}-${Date.now()}.${fileExt}`;
-
     const { error: uploadError } = await supabase.storage
       .from("product-images")
       .upload(fileName, file, {
@@ -163,26 +176,20 @@ function AdminProducts() {
         upsert: true,
         contentType: file.type,
       });
-
     if (uploadError) throw uploadError;
-
     const { data } = supabase.storage.from("product-images").getPublicUrl(fileName);
     if (!data?.publicUrl) throw new Error("Unable to generate public URL.");
-
     return data.publicUrl;
   };
-
   const handleMainImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
-
   const handleVariantImageChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const updated = [...variants];
     updated[index] = {
       ...updated[index],
@@ -191,7 +198,6 @@ function AdminProducts() {
     };
     setVariants(updated);
   };
-
   const handleAddVariantRow = () => {
     setVariants([
       ...variants,
@@ -208,340 +214,319 @@ function AdminProducts() {
       },
     ]);
   };
-
   const handleRemoveFormVariant = (index: number) => {
     setVariants(variants.filter((_, i) => i !== index));
   };
-
   const handleVariantFormChange = (index: number, field: keyof DatabaseVariant, val: any) => {
     const updated = [...variants];
     updated[index] = { ...updated[index], [field]: val };
     setVariants(updated);
   };
 
+  const handleCreateOrUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-const handleCreateOrUpdateProduct = async (e: React.FormEvent) => {
-  e.preventDefault();
-
-  if (!name.trim()) {
-    alert("Please enter a product name.");
-    return;
-  }
-
-  const numericPrice = Number(price);
-
-  if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
-    alert("Please enter a valid price.");
-    return;
-  }
-
-  try {
-    setUploadingImage(true);
-
-    /*
-     * IMPORTANT DATABASE STRUCTURE
-     *
-     * products.id       = TEXT primary key
-     * products.uuid_id  = UUID
-     * product_variations.product_id = UUID
-     *
-     * Therefore:
-     *
-     * product_variations.product_id MUST receive products.uuid_id
-     * NOT products.id
-     */
-
-    // ---------------------------------------------------------
-    // 1. Generate / preserve the TEXT product ID
-    // ---------------------------------------------------------
-
-    const productId = editingProduct
-      ? editingProduct.id
-      : generateProductId(name);
-
-    // ---------------------------------------------------------
-    // 2. Generate / preserve UUID
-    // ---------------------------------------------------------
-
-    const productUuid =
-      editingProduct?.uuid_id || crypto.randomUUID();
-
-    // ---------------------------------------------------------
-    // 3. Upload main product image if changed
-    // ---------------------------------------------------------
-
-    let mainImageUrl = editingProduct?.img || "";
-
-    if (imageFile) {
-      mainImageUrl = await uploadImageToStorage(
-        imageFile,
-        `product-${productId}`
-      );
+    if (!name.trim()) {
+      alert("Please enter a product name.");
+      return;
     }
+    const numericPrice = Number(price);
 
-    // ---------------------------------------------------------
-    // 4. Prepare product payload
-    // ---------------------------------------------------------
-
-    const productPayload = {
-      id: productId,
-      uuid_id: productUuid,
-
-      name: name.trim(),
-      tag: tag.trim() || null,
-
-      price: numericPrice,
-
-      img: mainImageUrl || null,
-
-      accent,
-      category,
-
-      summary: summary.trim() || null,
-      description: description.trim() || null,
-
-      slug: generateProductId(name),
-
-      // Keep these fields safe if they are not being managed
-      // through the form.
-      specs: editingProduct?.specs ?? null,
-      stack: editingProduct?.stack ?? null,
-      stock: editingProduct?.stock ?? 0,
-      variants: editingProduct?.product_variations ?? null,
-    };
-
-    // ---------------------------------------------------------
-    // 5. INSERT or UPDATE product
-    // ---------------------------------------------------------
-
-    if (editingProduct) {
-      const { error: productError } = await supabase
-        .from("products")
-        .update({
-          name: productPayload.name,
-          // uuid_id:productPayload.uuid,
-          tag: productPayload.tag,
-          price: productPayload.price,
-          img: productPayload.img,
-          accent: productPayload.accent,
-          category: productPayload.category,
-          summary: productPayload.summary,
-          description: productPayload.description,
-          slug: productPayload.slug,
-        })
-        .eq("id", editingProduct.id);
-
-      if (productError) {
-        throw productError;
-      }
-    } else {
-      const { error: productError } = await supabase
-        .from("products")
-        .insert([productPayload]);
-
-      if (productError) {
-        throw productError;
-      }
+    if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+      alert("Please enter a valid price.");
+      return;
     }
+    try {
+      setUploadingImage(true);
 
-    // ---------------------------------------------------------
-    // 6. Make sure we have the correct UUID from products
-    // ---------------------------------------------------------
+      // ---------------------------------------------------------
+      const productId = editingProduct
+        ? editingProduct.id
+        : generateProductId(name);
 
-    const { data: savedProduct, error: savedProductError } =
-      await supabase
-        .from("products")
-        .select("id, uuid_id")
-        .eq("id", productId)
-        .single();
+      // ---------------------------------------------------------
+      // 2. Generate / preserve UUID
+      // ---------------------------------------------------------
 
-    if (savedProductError) {
-      throw savedProductError;
-    }
+      const productUuid =
+        editingProduct?.uuid_id || crypto.randomUUID();
 
-    if (!savedProduct?.uuid_id) {
-      throw new Error(
-        "Product was saved, but products.uuid_id could not be found."
-      );
-    }
+      // ---------------------------------------------------------
+      // 3. Upload main product image if changed
+      // ---------------------------------------------------------
 
-    const variationProductUuid = savedProduct.uuid_id;
+      let mainImageUrl = editingProduct?.img || "";
 
-    // ---------------------------------------------------------
-    // 7. Determine which existing variations remain
-    // ---------------------------------------------------------
-
-    const existingVariationIds = (editingProduct?.product_variations || [])
-      .map((v) => v.id)
-      .filter(Boolean) as string[];
-
-    const submittedExistingVariationIds = variants
-      .map((v) => v.id)
-      .filter(Boolean) as string[];
-
-    // ---------------------------------------------------------
-    // 8. Delete variations removed from the edit form
-    // ---------------------------------------------------------
-
-    const variationIdsToDelete = existingVariationIds.filter(
-      (existingId) =>
-        !submittedExistingVariationIds.includes(existingId)
-    );
-
-    if (variationIdsToDelete.length > 0) {
-      const { error: deleteError } = await supabase
-        .from("product_variations")
-        .delete()
-        .in("id", variationIdsToDelete);
-
-      if (deleteError) {
-        throw deleteError;
-      }
-    }
-
-    // ---------------------------------------------------------
-    // 9. INSERT / UPDATE variations
-    // ---------------------------------------------------------
-
-    for (let index = 0; index < variants.length; index++) {
-      const v = variants[index];
-
-      // Ignore completely empty rows
-      if (!v.specification?.trim()) {
-        continue;
-      }
-
-      // -------------------------------------------------------
-      // Upload variation image if a new file was selected
-      // -------------------------------------------------------
-
-      let finalVariantImgUrl = v.img || null;
-
-      if (v.imageFile) {
-        finalVariantImgUrl = await uploadImageToStorage(
-          v.imageFile,
-          `variant-${productId}-${index}`
+      if (imageFile) {
+        mainImageUrl = await uploadImageToStorage(
+          imageFile,
+          `product-${productId}`
         );
       }
 
-      // -------------------------------------------------------
-      // Prepare variation payload
-      // -------------------------------------------------------
+      // ---------------------------------------------------------
+      // 4. Prepare product payload
+      // ---------------------------------------------------------
 
-      const variationPayload = {
-        /*
-         * THIS IS THE IMPORTANT FIX
-         *
-         * product_variations.product_id is UUID
-         * so we use products.uuid_id here.
-         */
-        product_id: variationProductUuid,
+      const productPayload = {
+        id: productId,
+        uuid_id: productUuid,
 
-        id_number:
-          v.id_number?.trim() ||
-          `SKU-${productId}-${Date.now()}-${index}`,
+        name: name.trim(),
+        tag: tag.trim() || null,
 
-        cas_number:
-          v.cas_number?.trim() || null,
+        price: numericPrice,
 
-        specification: v.specification.trim(),
+        img: mainImageUrl || null,
 
-        price: Number(v.price) || 0,
+        accent,
+        category,
 
-        quantity: Number(v.quantity) || 0,
+        summary: summary.trim() || null,
+        description: description.trim() || null,
 
-        stock: Number(v.stock) || 0,
+        slug: generateProductId(name),
 
-        img: finalVariantImgUrl,
+        // Keep these fields safe if they are not being managed
+        // through the form.
+        specs: editingProduct?.specs ?? null,
+        stack: editingProduct?.stack ?? null,
+        stock: editingProduct?.stock ?? 0,
+        variants: editingProduct?.product_variations ?? null,
       };
 
-      // -------------------------------------------------------
-      // UPDATE existing variation
-      // -------------------------------------------------------
+      // ---------------------------------------------------------
+      // 5. INSERT or UPDATE product
+      // ---------------------------------------------------------
 
-      if (v.id) {
-        const { error: updateVariationError } = await supabase
-          .from("product_variations")
-          .update(variationPayload)
-          .eq("id", v.id);
+      if (editingProduct) {
+        const { error: productError } = await supabase
+          .from("products")
+          .update({
+            name: productPayload.name,
+            // uuid_id:productPayload.uuid,
+            tag: productPayload.tag,
+            price: productPayload.price,
+            img: productPayload.img,
+            accent: productPayload.accent,
+            category: productPayload.category,
+            summary: productPayload.summary,
+            description: productPayload.description,
+            slug: productPayload.slug,
+          })
+          .eq("id", editingProduct.id);
 
-        if (updateVariationError) {
-          throw updateVariationError;
+        if (productError) {
+          throw productError;
+        }
+      } else {
+        const { error: productError } = await supabase
+          .from("products")
+          .insert([productPayload]);
+
+        if (productError) {
+          throw productError;
         }
       }
 
-      // -------------------------------------------------------
-      // INSERT new variation
-      // -------------------------------------------------------
+      // ---------------------------------------------------------
+      // 6. Make sure we have the correct UUID from products
+      // ---------------------------------------------------------
 
-      else {
-        const { error: insertVariationError } = await supabase
+      const { data: savedProduct, error: savedProductError } =
+        await supabase
+          .from("products")
+          .select("id, uuid_id")
+          .eq("id", productId)
+          .single();
+
+      if (savedProductError) {
+        throw savedProductError;
+      }
+
+      if (!savedProduct?.uuid_id) {
+        throw new Error(
+          "Product was saved, but products.uuid_id could not be found."
+        );
+      }
+
+      const variationProductUuid = savedProduct.uuid_id;
+
+      // ---------------------------------------------------------
+      // 7. Determine which existing variations remain
+      // ---------------------------------------------------------
+
+      const existingVariationIds = (editingProduct?.product_variations || [])
+        .map((v) => v.id)
+        .filter(Boolean) as string[];
+
+      const submittedExistingVariationIds = variants
+        .map((v) => v.id)
+        .filter(Boolean) as string[];
+
+      // ---------------------------------------------------------
+      // 8. Delete variations removed from the edit form
+      // ---------------------------------------------------------
+
+      const variationIdsToDelete = existingVariationIds.filter(
+        (existingId) =>
+          !submittedExistingVariationIds.includes(existingId)
+      );
+
+      if (variationIdsToDelete.length > 0) {
+        const { error: deleteError } = await supabase
           .from("product_variations")
-          .insert([
-            variationPayload,
-          ]);
+          .delete()
+          .in("id", variationIdsToDelete);
 
-        if (insertVariationError) {
-          throw insertVariationError;
+        if (deleteError) {
+          throw deleteError;
         }
       }
+
+      // ---------------------------------------------------------
+      // 9. INSERT / UPDATE variations
+      // ---------------------------------------------------------
+
+      for (let index = 0; index < variants.length; index++) {
+        const v = variants[index];
+
+        // Ignore completely empty rows
+        if (!v.specification?.trim()) {
+          continue;
+        }
+
+        // -------------------------------------------------------
+        // Upload variation image if a new file was selected
+        // -------------------------------------------------------
+
+        let finalVariantImgUrl = v.img || null;
+
+        if (v.imageFile) {
+          finalVariantImgUrl = await uploadImageToStorage(
+            v.imageFile,
+            `variant-${productId}-${index}`
+          );
+        }
+
+        // -------------------------------------------------------
+        // Prepare variation payload
+        // -------------------------------------------------------
+
+        const variationPayload = {
+          /*
+           * THIS IS THE IMPORTANT FIX
+           *
+           * product_variations.product_id is UUID
+           * so we use products.uuid_id here.
+           */
+          product_id: variationProductUuid,
+
+          id_number:
+            v.id_number?.trim() ||
+            `SKU-${productId}-${Date.now()}-${index}`,
+
+          cas_number:
+            v.cas_number?.trim() || null,
+
+          specification: v.specification.trim(),
+
+          price: Number(v.price) || 0,
+
+          quantity: Number(v.quantity) || 0,
+
+          stock: Number(v.stock) || 0,
+
+          img: finalVariantImgUrl,
+        };
+
+        // -------------------------------------------------------
+        // UPDATE existing variation
+        // -------------------------------------------------------
+
+        if (v.id) {
+          const { error: updateVariationError } = await supabase
+            .from("product_variations")
+            .update(variationPayload)
+            .eq("id", v.id);
+
+          if (updateVariationError) {
+            throw updateVariationError;
+          }
+        }
+
+        // -------------------------------------------------------
+        // INSERT new variation
+        // -------------------------------------------------------
+
+        else {
+          const { error: insertVariationError } = await supabase
+            .from("product_variations")
+            .insert([
+              variationPayload,
+            ]);
+
+          if (insertVariationError) {
+            throw insertVariationError;
+          }
+        }
+      }
+
+      // ---------------------------------------------------------
+      // 10. Refresh UI
+      // ---------------------------------------------------------
+
+      setIsModalOpen(false);
+
+      resetForm();
+
+      await fetchProducts();
+
+    } catch (error: any) {
+      console.error("Failed to save product:", error);
+
+      alert(
+        error?.message ||
+        error?.details ||
+        "Failed to save product."
+      );
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+
+
+  const handleUpdateVariantInline = async (
+    variantId: string,
+    field: keyof DatabaseVariant,
+    value: any
+  ) => {
+    let updateValue = value;
+
+    if (field === "price") {
+      updateValue = Number(value);
     }
 
-    // ---------------------------------------------------------
-    // 10. Refresh UI
-    // ---------------------------------------------------------
+    if (field === "stock" || field === "quantity") {
+      updateValue = Number.parseInt(value, 10) || 0;
+    }
 
-    setIsModalOpen(false);
+    const { error } = await supabase
+      .from("product_variations")
+      .update({
+        [field]: updateValue,
+      })
+      .eq("id", variantId);
 
-    resetForm();
+    if (error) {
+      console.error("Variant update error:", error);
+      alert("Failed to update variant: " + error.message);
+      return;
+    }
 
     await fetchProducts();
-
-  } catch (error: any) {
-    console.error("Failed to save product:", error);
-
-    alert(
-      error?.message ||
-      error?.details ||
-      "Failed to save product."
-    );
-  } finally {
-    setUploadingImage(false);
-  }
-};
-
-
-
-const handleUpdateVariantInline = async (
-  variantId: string,
-  field: keyof DatabaseVariant,
-  value: any
-) => {
-  let updateValue = value;
-
-  if (field === "price") {
-    updateValue = Number(value);
-  }
-
-  if (field === "stock" || field === "quantity") {
-    updateValue = Number.parseInt(value, 10) || 0;
-  }
-
-  const { error } = await supabase
-    .from("product_variations")
-    .update({
-      [field]: updateValue,
-    })
-    .eq("id", variantId);
-
-  if (error) {
-    console.error("Variant update error:", error);
-    alert("Failed to update variant: " + error.message);
-    return;
-  }
-
-  await fetchProducts();
-};
+  };
 
 
   const handleDeleteVariantInline = async (variantId: string) => {
@@ -568,7 +553,7 @@ const handleUpdateVariantInline = async (
 
   const openEditModal = (product: ExtendedProduct) => {
     setEditingProduct(product);
-    
+
     setName(product.name || "");
     setTag(product.tag || "");
     setPrice(String(product.price ?? ""));
@@ -659,18 +644,51 @@ const handleUpdateVariantInline = async (
       {/* TABLE 1: MASTER PRODUCTS TABLE */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h2 className="text-lg font-bold text-slate-800">1. Master Products</h2>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 font-medium">Rows per page:</span>
-            <select
-              value={productItemsPerPage}
-              onChange={(e) => setProductItemsPerPage(Number(e.target.value))}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-sm focus:border-[rgb(43_90_143)] focus:outline-none"
-            >
-              <option value={5}>5 Per Page</option>
-              <option value={10}>10 Per Page</option>
-              <option value={20}>20 Per Page</option>
-            </select>
+          <h2 className="text-lg font-bold text-slate-800">
+            1. Master Products
+          </h2>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Product Search */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                className="w-64 rounded-xl border border-slate-200 bg-white px-3 py-1.5 pr-8 text-xs text-slate-700 shadow-sm focus:border-[rgb(43_90_143)] focus:outline-none"
+              />
+
+              {productSearch && (
+                <button
+                  type="button"
+                  onClick={() => setProductSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 hover:text-slate-700"
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            {/* Rows Per Page */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-slate-500">
+                Rows per page:
+              </span>
+
+              <select
+                value={productItemsPerPage}
+                onChange={(e) =>
+                  setProductItemsPerPage(Number(e.target.value))
+                }
+                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-sm focus:border-[rgb(43_90_143)] focus:outline-none"
+              >
+                <option value={5}>5 Per Page</option>
+                <option value={10}>10 Per Page</option>
+                <option value={20}>20 Per Page</option>
+              </select>
+            </div>
           </div>
         </div>
 
