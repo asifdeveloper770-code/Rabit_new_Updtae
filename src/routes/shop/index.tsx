@@ -213,11 +213,10 @@ function ShopPage() {
                 });
                 setMobileFiltersOpen(false);
               }}
-              className={`group relative flex w-full items-center justify-between rounded-lg border-l-2 py-2.5 pl-3 pr-2 text-left font-sans text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
-                cat === c
+              className={`group relative flex w-full items-center justify-between rounded-lg border-l-2 py-2.5 pl-3 pr-2 text-left font-sans text-xs font-bold uppercase tracking-wider transition-all duration-200 ${cat === c
                   ? "border-[rgb(43_90_143)] bg-white text-[rgb(43_90_143)] shadow-sm"
                   : "border-transparent text-slate-500 hover:bg-slate-100/70 hover:pl-4 hover:text-[rgb(43_90_143)]"
-              }`}
+                }`}
             >
               <span>{c}</span>
               {cat === c && (
@@ -244,11 +243,10 @@ function ShopPage() {
                 });
                 setMobileFiltersOpen(false);
               }}
-              className={`group flex w-full items-center justify-between rounded-lg border-l-2 py-2.5 pl-3 pr-2 text-left font-sans text-xs transition-all duration-200 ${
-                sort === s.key
+              className={`group flex w-full items-center justify-between rounded-lg border-l-2 py-2.5 pl-3 pr-2 text-left font-sans text-xs transition-all duration-200 ${sort === s.key
                   ? "border-[rgb(93_138_111)] bg-white font-bold text-[rgb(93_138_111)] shadow-sm"
                   : "border-transparent font-medium text-slate-500 hover:bg-slate-100/70 hover:pl-4 hover:text-[rgb(93_138_111)]"
-              }`}
+                }`}
             >
               <span>{s.label}</span>
               {sort === s.key && (
@@ -265,17 +263,20 @@ function ShopPage() {
     <main className="relative min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 pt-16 font-sans text-slate-800 antialiased selection:bg-[rgb(43_90_143)]/10 selection:text-[rgb(43_90_143)] sm:pt-28">
       {/* Header Container */}
       <section className="w-full border-b border-slate-200/80 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-end justify-between gap-2 px-3 py-4 sm:px-6 md:px-12 md:py-12">
-          <div>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-end justify-between gap-2 px-3 py-4 text-center sm:px-6 sm:py-12 sm:text-left md:px-12">
+          <div className="w-full sm:w-auto">
             <span className="font-sans text-[9px] font-bold uppercase tracking-widest text-[rgb(43_90_143)] sm:text-xs">
               Catalogue
             </span>
+
             <h1 className="mt-0.5 font-sans text-xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-4xl md:text-6xl">
               Research peptides
             </h1>
           </div>
-          <p className="max-w-sm font-sans text-[11px] leading-tight text-slate-600 sm:text-sm">
-            {products.length} compounds available. Select a compound to view specifications, variants, pricing, and details.
+
+          <p className="mx-auto max-w-sm font-sans text-[11px] leading-tight text-slate-600 sm:mx-0 sm:text-sm">
+            {products.length} compounds available. Select a compound to view
+            specifications, variants, pricing, and details.
           </p>
         </div>
       </section>
@@ -364,12 +365,12 @@ function ShopPage() {
                 sort === "popularity"
                   ? undefined
                   : () =>
-                      navigate({
-                        search: (p: any) => ({
-                          ...p,
-                          sort: undefined,
-                        }),
-                      })
+                    navigate({
+                      search: (p: any) => ({
+                        ...p,
+                        sort: undefined,
+                      }),
+                    })
               }
             />
           </div>
@@ -432,11 +433,10 @@ function ShopPage() {
                             setCurrentPage(page);
                             window.scrollTo({ top: 0, behavior: "smooth" });
                           }}
-                          className={`flex h-7 min-w-7 items-center justify-center rounded-lg px-1.5 text-xs font-bold transition-all sm:h-9 sm:min-w-9 sm:px-3 ${
-                            currentPage === page
+                          className={`flex h-7 min-w-7 items-center justify-center rounded-lg px-1.5 text-xs font-bold transition-all sm:h-9 sm:min-w-9 sm:px-3 ${currentPage === page
                               ? "bg-[rgb(43_90_143)] text-white shadow-xs"
                               : "border border-slate-200 bg-white text-slate-500 hover:border-[rgb(43_90_143)] hover:text-[rgb(43_90_143)]"
-                          }`}
+                            }`}
                         >
                           {page}
                         </button>
@@ -559,11 +559,10 @@ function Chip({
   const isGreen = tone === "green";
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-sans text-[9px] font-bold transition-all sm:text-xs ${
-        isGreen
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-sans text-[9px] font-bold transition-all sm:text-xs ${isGreen
           ? "border-[rgb(93_138_111)]/30 bg-[rgb(93_138_111)]/10 text-[rgb(93_138_111)]"
           : "border-[rgb(43_90_143)]/30 bg-[rgb(43_90_143)]/10 text-[rgb(43_90_143)]"
-      }`}
+        }`}
     >
       {label}
       {onClear && (

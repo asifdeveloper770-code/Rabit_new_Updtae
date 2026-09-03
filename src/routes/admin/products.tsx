@@ -23,6 +23,7 @@ export interface DatabaseVariant {
 
 export interface ExtendedProduct extends Product {
   slug: any;
+  uuid_id?: string | null;
   product_variations?: DatabaseVariant[];
 }
 

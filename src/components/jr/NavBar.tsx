@@ -8,7 +8,6 @@ import { useCart } from "@/lib/cart";
 const LINKS = [
   { to: "/", label: "Home" },
   { to: "/shop", label: "Shop" },
-  { to: "/results", label: "Results" },
   { to: "/science", label: "Science" },
   { to: "/contact", label: "Contact" },
 ] as const;
